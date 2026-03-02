@@ -329,6 +329,36 @@ async function copyToClipboard(text: string) {
   await navigator.clipboard.writeText(text);
 }
 
+  // 🔒 접근 비밀번호 게이트
+  const [authOk, setAuthOk] = useState(false);
+  const [accessPw, setAccessPw] = useState("");
+  const [authErr, setAuthErr] = useState<string | null>(null);
+  const [authLoading, setAuthLoading] = useState(false);
+
+  async function doAuth() {
+    setAuthLoading(true);
+    setAuthErr(null);
+    try {
+      const res = await fetch("/api/auth", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ password: accessPw }),
+      });
+
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data?.error || `Auth failed (${res.status})`);
+      }
+
+      setAuthOk(true);
+      setAccessPw("");
+    } catch (e: any) {
+      setAuthErr(e?.message || "Auth failed");
+    } finally {
+      setAuthLoading(false);
+    }
+  }
+
 export default function Page() {
   const [apiKey, setApiKey]       = useState("");
   const [region, setRegion]       = useState("송도");
@@ -437,6 +467,49 @@ export default function Page() {
     } finally {
       setLoading(false);
     }
+  }
+
+  // 🔒 인증 안 됐으면 비번 입력 화면만 보여줌
+  if (!authOk) {
+    return (
+      <div className="min-h-screen bg-neutral-950 text-neutral-100 flex items-center justify-center p-6">
+        <div className="w-full max-w-md rounded-2xl border border-neutral-800 bg-neutral-900/40 p-6">
+          <h1 className="text-xl font-bold">CLASSBY 전용</h1>
+          <p className="mt-1 text-sm text-neutral-300">
+            접근 비밀번호를 입력하세요.
+          </p>
+
+          <input
+            type="password"
+            value={accessPw}
+            onChange={(e) => setAccessPw(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") doAuth();
+            }}
+            placeholder="비밀번호"
+            className="mt-4 w-full rounded-xl bg-neutral-950 border border-neutral-800 px-3 py-2"
+          />
+
+          {authErr && (
+            <div className="mt-3 text-sm text-red-300 whitespace-pre-line">
+              {authErr}
+            </div>
+          )}
+
+          <button
+            onClick={doAuth}
+            disabled={authLoading || !accessPw}
+            className="mt-4 w-full rounded-xl bg-white text-black font-semibold py-3 disabled:opacity-60"
+          >
+            {authLoading ? "확인 중..." : "입장"}
+          </button>
+
+          <div className="mt-4 text-xs text-neutral-400">
+            비번은 관리자가 제공한 값(classby0307)입니다.
+          </div>
+        </div>
+      </div>
+    );
   }
 
   return (

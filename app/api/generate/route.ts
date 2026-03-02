@@ -1,3 +1,6 @@
+import crypto from "crypto";
+import { cookies } from "next/headers";
+
 import { NextResponse } from "next/server";
 
 export const runtime = "nodejs";
@@ -443,6 +446,26 @@ function parseAndValidate(rawText: string, coreKeyword?: string): ParseResult {
 // ─────────────────────────────────────────────
 
 export async function POST(req: Request) {
+
+    // 🔒 인증 먼저
+  const secret = process.env.CLASSBY_ACCESS_PASSWORD;
+  if (!secret) {
+    return NextResponse.json(
+      { error: "Server is missing CLASSBY_ACCESS_PASSWORD" },
+      { status: 500 }
+    );
+  }
+
+  const token = cookies().get("cb_auth")?.value || "";
+  const expected = crypto
+    .createHmac("sha256", secret)
+    .update("cb_auth_v1")
+    .digest("hex");
+
+  if (token !== expected) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
   // 1. Request 파싱
   let body: Payload;
   try {
