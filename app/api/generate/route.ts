@@ -455,8 +455,8 @@ export async function POST(req: Request) {
       { status: 500 }
     );
   }
-
-  const token = cookies().get("cb_auth")?.value || "";
+const cookieStore = await cookies();
+const token = cookieStore.get("cb_auth")?.value || "";
   const expected = crypto
     .createHmac("sha256", secret)
     .update("cb_auth_v1")
