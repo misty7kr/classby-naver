@@ -1,6 +1,5 @@
 import crypto from "crypto";
 import { cookies } from "next/headers";
-
 import { NextResponse } from "next/server";
 
 export const runtime = "nodejs";
@@ -29,7 +28,6 @@ type Payload = {
   };
 };
 
-// titles length 5, hashtags length 20은 validateOutput()으로 보장
 type BlogPostOutput = {
   titles: string[];
   body: string;
@@ -40,8 +38,8 @@ type BlogPostOutput = {
 // Constants
 // ─────────────────────────────────────────────
 
-const DEFAULT_MODEL = "gpt-4.1-mini";  // 항상 되는 기본값
-const HUMANIZE_MODEL = "gpt-4.1-mini"; // Pass2 인간화 전용 (nano는 접근 불가 계정 있음)
+const DEFAULT_MODEL = "gpt-4.1-mini";
+const HUMANIZE_MODEL = "gpt-4.1-mini";
 const MIN_BODY_LENGTH = 700;
 
 // ─────────────────────────────────────────────
@@ -107,13 +105,13 @@ const INTENT_GUIDE: Record<string, string> = {
 };
 
 // ─────────────────────────────────────────────
-// 핵심 키워드 생성 (buildUserPrompt + POST handler 공유)
+// Core keyword
 // ─────────────────────────────────────────────
 
 function makeCoreKeyword(input: Payload["input"]): string {
   const subject = SUBJECT_LABEL[input.subject] ?? input.subject;
-  const grade   = GRADE_LABEL[input.gradeBand] ?? input.gradeBand;
-  const goal    = GOAL_LABEL[input.goal] ?? input.goal;
+  const grade = GRADE_LABEL[input.gradeBand] ?? input.gradeBand;
+  const goal = GOAL_LABEL[input.goal] ?? input.goal;
 
   return input.schoolName?.trim()
     ? `${input.region} ${input.schoolName.trim()} ${grade} ${subject} ${goal}`
@@ -121,7 +119,7 @@ function makeCoreKeyword(input: Payload["input"]): string {
 }
 
 // ─────────────────────────────────────────────
-// PASS 1 — 글 생성 프롬프트
+// PASS 1 prompt
 // ─────────────────────────────────────────────
 
 function buildSystemPrompt(): string {
@@ -140,7 +138,6 @@ function buildSystemPrompt(): string {
 - FAQ 3개 포함 (Q: / A: 형식)
 - 마지막 CTA: 압박 없이 부드럽게 ("필요하시면 편하게 문의해 주세요" 수준)
 - 첫 문단 120자 이내에 핵심 키워드 정확히 1회 포함
-  (예: 핵심 키워드가 "송도 고등 영어 내신"이면 이 조합이 첫 문단 안에 그대로 들어가야 함)
 
 [출력 형식]
 반드시 아래 JSON 스키마만 출력하고, 그 외 텍스트(마크다운 코드블록 포함)는 절대 출력하지 마세요:
@@ -158,10 +155,7 @@ function buildUserPrompt(input: Payload["input"]): string {
   const goalLabel = GOAL_LABEL[input.goal] ?? input.goal;
   const intentGuide = INTENT_GUIDE[input.intent] ?? `[글 타입: ${input.intent}]`;
 
-  const schoolPart = input.schoolName?.trim()
-    ? `학교명: ${input.schoolName.trim()}\n`
-    : "";
-
+  const schoolPart = input.schoolName?.trim() ? `학교명: ${input.schoolName.trim()}\n` : "";
   const coreKeyword = makeCoreKeyword(input);
 
   const commercialTags = input.schoolName?.trim()
@@ -211,36 +205,19 @@ ${intentGuide}
 }
 
 // ─────────────────────────────────────────────
-// PASS 2 — 인간화 프롬프트
+// PASS 2 prompt
 // ─────────────────────────────────────────────
 
 function buildHumanizeSystemPrompt(): string {
   return `
 당신은 한국어 블로그 글을 자연스러운 사람 말투로 다듬는 에디터입니다.
 
-[핵심 목표]
-AI가 쓴 것처럼 보이는 패턴을 제거하고, 실제 학원 원장이나 입시 상담사가 직접 쓴 것처럼 만드세요.
-
-[반드시 제거할 AI 패턴]
-- "~해야 합니다" 반복 → "~하는 게 좋아요" / "~하시면 도움이 됩니다"
-- "먼저 ~ 다음으로 ~ 마지막으로" 기계적 나열 → 자연스러운 흐름으로
-- "중요한 것은 ~입니다" 단정형 → "저는 ~이 중요하다고 봐요"
-- "물론", "또한", "따라서", "그러므로" 남발 → 제거하거나 구어체로 변환
-- 모든 문장 길이가 비슷한 패턴 → 짧은 문장 1~2개 중간에 섞기
-- 리스트 과다 → 일부를 자연스러운 문단으로 풀어쓰기
-
 [절대 변경 금지]
 - 소제목 구조, FAQ 형식
 - 핵심 키워드 (첫 문단 포함)
 - 해시태그 목록
-- 사실 정보 (학교명, 지역, 과목, 시즌, 수치)
+- 사실 정보
 - 전체 분량 (±10% 이내 유지)
-- 과장 표현은 여전히 금지
-
-[목표 말투]
-- 블로그 대화체: "~요", "~거든요", "~더라고요" 자연스럽게
-- 현장감 있는 표현: "실제로 상담하다 보면", "많은 학생들이 이런 경우에"
-- 공감 표현 1~2개: "사실 이게 생각보다 중요해요", "저도 처음엔 이걸 몰랐는데"
 
 [출력 형식]
 입력과 동일한 JSON 구조로만 출력하세요:
@@ -254,11 +231,11 @@ JSON 외 텍스트 절대 금지.
 }
 
 function buildHumanizeUserPrompt(draft: BlogPostOutput): string {
-  return `아래 블로그 글 초안을 인간화해주세요. body를 중심으로 자연스럽게 다듬고, titles와 hashtags는 어색한 부분만 살짝 수정하되 핵심 키워드와 해시태그 구성은 유지하세요.\n\n${JSON.stringify(draft, null, 2)}`;
+  return `아래 블로그 글 초안을 인간화해주세요.\n\n${JSON.stringify(draft, null, 2)}`;
 }
 
 // ─────────────────────────────────────────────
-// OpenAI API 호출 공통 함수
+// OpenAI call
 // ─────────────────────────────────────────────
 
 async function callOpenAI(
@@ -268,8 +245,6 @@ async function callOpenAI(
   userPrompt: string,
   options: { temperature?: number } = {}
 ): Promise<{ ok: boolean; text: string; status: number }> {
-  // gpt-5.x 계열: temperature 제거 + reasoning 사용
-  // gpt-4.x 계열: temperature 사용
   const isGpt5 = model.startsWith("gpt-5");
 
   const payload: Record<string, unknown> = {
@@ -288,39 +263,21 @@ async function callOpenAI(
           additionalProperties: false,
           required: ["titles", "body", "hashtags"],
           properties: {
-            titles: {
-              type: "array",
-              items: { type: "string" },
-              minItems: 5,
-              maxItems: 5,
-            },
+            titles: { type: "array", items: { type: "string" }, minItems: 5, maxItems: 5 },
             body: { type: "string" },
-            hashtags: {
-              type: "array",
-              items: { type: "string" },
-              minItems: 20,
-              maxItems: 20,
-            },
+            hashtags: { type: "array", items: { type: "string" }, minItems: 20, maxItems: 20 },
           },
         },
       },
     },
   };
 
-  if (isGpt5) {
-    // 추론 계열: reasoning effort로 제어 (temperature 미지원)
-    payload.reasoning = { effort: "low" };
-  } else {
-    // GPT-4.x 계열: temperature 사용
-    payload.temperature = options.temperature ?? 0.75;
-  }
+  if (isGpt5) payload.reasoning = { effort: "low" };
+  else payload.temperature = options.temperature ?? 0.75;
 
   const response = await fetch("https://api.openai.com/v1/responses", {
     method: "POST",
-    headers: {
-      Authorization: `Bearer ${apiKey}`,
-      "Content-Type": "application/json",
-    },
+    headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
     body: JSON.stringify(payload),
   });
 
@@ -328,61 +285,38 @@ async function callOpenAI(
   return { ok: response.ok, text, status: response.status };
 }
 
-// ─────────────────────────────────────────────
-// 응답 텍스트 추출
-// ─────────────────────────────────────────────
-
 function extractOutputText(data: unknown): string | undefined {
   if (!data || typeof data !== "object") return undefined;
   const d = data as Record<string, unknown>;
 
-  // Responses API: output_text 최우선
-  if (typeof d.output_text === "string" && d.output_text.trim()) {
-    return d.output_text;
-  }
+  if (typeof d.output_text === "string" && d.output_text.trim()) return d.output_text;
 
-  // Responses API: output[].content[].text (type 체크 포함)
   if (Array.isArray(d.output)) {
-    for (const block of d.output as Record<string, unknown>[]) {
+    for (const block of d.output as any[]) {
       if (Array.isArray(block?.content)) {
-        for (const item of block.content as Record<string, unknown>[]) {
-          const isTextType =
-            item?.type === "output_text" || item?.type === "text";
-          if (
-            isTextType &&
-            typeof item?.text === "string" &&
-            item.text.trim()
-          ) {
-            return item.text;
-          }
+        for (const item of block.content as any[]) {
+          const isTextType = item?.type === "output_text" || item?.type === "text";
+          if (isTextType && typeof item?.text === "string" && item.text.trim()) return item.text;
         }
       }
     }
   }
 
-  // Chat Completions API fallback
   if (Array.isArray(d.choices)) {
-    const choices = d.choices as Record<string, unknown>[];
-    const content = (choices[0]?.message as Record<string, unknown>)?.content;
+    const choices = d.choices as any[];
+    const content = choices?.[0]?.message?.content;
     if (typeof content === "string" && content.trim()) return content;
   }
 
   return undefined;
 }
 
-// ─────────────────────────────────────────────
-// JSON 파싱 + 검증
-// ─────────────────────────────────────────────
-
 type ParseResult =
   | { success: true; data: BlogPostOutput }
   | { success: false; reason: string; detail?: unknown };
 
 function parseAndValidate(rawText: string, coreKeyword?: string): ParseResult {
-  const clean = rawText
-    .replace(/^```json\s*/i, "")
-    .replace(/```\s*$/, "")
-    .trim();
+  const clean = rawText.replace(/^```json\s*/i, "").replace(/```\s*$/, "").trim();
 
   let parsed: unknown;
   try {
@@ -390,38 +324,24 @@ function parseAndValidate(rawText: string, coreKeyword?: string): ParseResult {
   } catch {
     return { success: false, reason: "JSON parse failed" };
   }
+  if (!parsed || typeof parsed !== "object") return { success: false, reason: "Not an object" };
 
-  if (!parsed || typeof parsed !== "object") {
-    return { success: false, reason: "Not an object" };
-  }
-
-  const p = parsed as Record<string, unknown>;
+  const p = parsed as any;
 
   const okTitles =
-    Array.isArray(p.titles) &&
-    p.titles.length === 5 &&
-    p.titles.every((t) => typeof t === "string" && t.trim().length > 0);
+    Array.isArray(p.titles) && p.titles.length === 5 && p.titles.every((t: any) => typeof t === "string" && t.trim());
 
-  const okBody =
-    typeof p.body === "string" && p.body.trim().length >= MIN_BODY_LENGTH;
+  const okBody = typeof p.body === "string" && p.body.trim().length >= MIN_BODY_LENGTH;
 
-  // 첫 문단 앞 120자 안에 핵심 키워드 포함 여부 체크
-  // 공백 제거 비교도 병행 → "송도고등영어내신"처럼 붙여쓴 경우도 통과
-  const firstParagraph = typeof p.body === "string"
-    ? (p.body.split(/\n\n|\n/)[0] ?? "")
-    : "";
-  const first120     = firstParagraph.slice(0, 120);
-  const okKeyword    = !coreKeyword || (
+  const firstParagraph = typeof p.body === "string" ? (p.body.split(/\n\n|\n/)[0] ?? "") : "";
+  const first120 = firstParagraph.slice(0, 120);
+  const okKeyword =
+    !coreKeyword ||
     first120.includes(coreKeyword) ||
-    first120.replace(/\s/g, "").includes(coreKeyword.replace(/\s/g, ""))
-  );
+    first120.replace(/\s/g, "").includes(coreKeyword.replace(/\s/g, ""));
 
   const okTags =
-    Array.isArray(p.hashtags) &&
-    p.hashtags.length === 20 &&
-    p.hashtags.every(
-      (h) => typeof h === "string" && h.trim().startsWith("#")
-    );
+    Array.isArray(p.hashtags) && p.hashtags.length === 20 && p.hashtags.every((h: any) => typeof h === "string" && h.trim().startsWith("#"));
 
   if (!okTitles || !okBody || !okTags || !okKeyword) {
     return {
@@ -438,7 +358,7 @@ function parseAndValidate(rawText: string, coreKeyword?: string): ParseResult {
     };
   }
 
-  return { success: true, data: parsed as BlogPostOutput };
+  return { success: true, data: p as BlogPostOutput };
 }
 
 // ─────────────────────────────────────────────
@@ -446,27 +366,21 @@ function parseAndValidate(rawText: string, coreKeyword?: string): ParseResult {
 // ─────────────────────────────────────────────
 
 export async function POST(req: Request) {
-
-    // 🔒 인증 먼저
+  // 🔒 Gate 먼저 (환경변수 + 쿠키 체크)
   const secret = process.env.CLASSBY_ACCESS_PASSWORD;
   if (!secret) {
-    return NextResponse.json(
-      { error: "Server is missing CLASSBY_ACCESS_PASSWORD" },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: "Server is missing CLASSBY_ACCESS_PASSWORD" }, { status: 500 });
   }
-const cookieStore = await cookies();
-const token = cookieStore.get("cb_auth")?.value || "";
-  const expected = crypto
-    .createHmac("sha256", secret)
-    .update("cb_auth_v1")
-    .digest("hex");
+
+  const cookieStore = await cookies(); // ✅ Next 최신 타입 대응
+  const token = cookieStore.get("cb_auth")?.value || "";
+  const expected = crypto.createHmac("sha256", secret).update("cb_auth_v1").digest("hex");
 
   if (token !== expected) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  // 1. Request 파싱
+  // 1) parse
   let body: Payload;
   try {
     body = (await req.json()) as Payload;
@@ -474,60 +388,33 @@ const token = cookieStore.get("cb_auth")?.value || "";
     return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
   }
 
-  // 2. 필수값 검증
   const apiKey = body?.apiKey?.trim();
-  if (!apiKey) {
-    return NextResponse.json({ error: "Missing apiKey" }, { status: 400 });
-  }
-  if (!body?.input?.topicTitle?.trim()) {
-    return NextResponse.json({ error: "Missing topicTitle" }, { status: 400 });
-  }
-  if (!body?.input?.region?.trim()) {
-    return NextResponse.json({ error: "Missing region" }, { status: 400 });
-  }
+  if (!apiKey) return NextResponse.json({ error: "Missing apiKey" }, { status: 400 });
+  if (!body?.input?.topicTitle?.trim()) return NextResponse.json({ error: "Missing topicTitle" }, { status: 400 });
+  if (!body?.input?.region?.trim()) return NextResponse.json({ error: "Missing region" }, { status: 400 });
 
   const model = body.model?.trim() || DEFAULT_MODEL;
-
-  // ── PASS 1: 글 생성 ──────────────────────────
-
-  // coreKeyword: buildUserPrompt와 동일한 함수로 생성 → 불일치 방지
   const coreKeyword = makeCoreKeyword(body.input);
 
-  // Pass1 실행 함수 (재시도 시 temperature만 달라짐)
   async function runPass1(temperature: number) {
-    const res = await callOpenAI(
-      apiKey,
-      model,
-      buildSystemPrompt(),
-      buildUserPrompt(body.input),
-      { temperature }
-    );
-    return res;
+    return await callOpenAI(apiKey, model, buildSystemPrompt(), buildUserPrompt(body.input), { temperature });
   }
 
+  // PASS1
   let pass1Res: { ok: boolean; text: string; status: number };
   try {
     pass1Res = await runPass1(0.75);
-  } catch (e: unknown) {
-    const msg = e instanceof Error ? e.message : "unknown error";
-    return NextResponse.json(
-      { error: `[Pass1] Upstream failed: ${msg}` },
-      { status: 502 }
-    );
+  } catch (e: any) {
+    return NextResponse.json({ error: `[Pass1] Upstream failed: ${e?.message ?? "unknown"}` }, { status: 502 });
   }
 
   if (!pass1Res.ok) {
     let detail: unknown = pass1Res.text;
-    try { detail = JSON.parse(pass1Res.text); } catch { /* keep raw */ }
-    console.error("[Pass1 error]", pass1Res.status, JSON.stringify(detail));
-    return NextResponse.json(
-      { error: `[Pass1] OpenAI error (${pass1Res.status})`, detail },
-      { status: 502 }
-    );
+    try { detail = JSON.parse(pass1Res.text); } catch {}
+    return NextResponse.json({ error: `[Pass1] OpenAI error (${pass1Res.status})`, detail }, { status: 502 });
   }
 
-  // Pass1 파싱 + 검증 헬퍼
-  function tryParse1(res: { text: string }) {
+  function tryParse(res: { text: string }) {
     let data: unknown;
     try { data = JSON.parse(res.text); } catch { return null; }
     const text = extractOutputText(data);
@@ -535,81 +422,43 @@ const token = cookieStore.get("cb_auth")?.value || "";
     return parseAndValidate(text, coreKeyword);
   }
 
-  let pass1Result = tryParse1(pass1Res);
+  let pass1Result = tryParse(pass1Res);
 
-  // 검증 실패 시 1회 재시도: temperature 낮춰서 더 충실하게
   if (!pass1Result || !pass1Result.success) {
-    console.warn("[Pass1] 검증 실패, 재시도 (temperature 0.4):", pass1Result);
     try {
       pass1Res = await runPass1(0.4);
-
       if (!pass1Res.ok) {
-        let retryDetail: unknown = pass1Res.text;
-        try { retryDetail = JSON.parse(pass1Res.text); } catch { /* keep raw */ }
-        console.error("[Pass1 retry error]", pass1Res.status, JSON.stringify(retryDetail));
-        return NextResponse.json(
-          { error: `[Pass1 retry] OpenAI error (${pass1Res.status})`, detail: retryDetail },
-          { status: 502 }
-        );
+        let detail: unknown = pass1Res.text;
+        try { detail = JSON.parse(pass1Res.text); } catch {}
+        return NextResponse.json({ error: `[Pass1 retry] OpenAI error (${pass1Res.status})`, detail }, { status: 502 });
       }
-
-      pass1Result = tryParse1(pass1Res);
-    } catch (e: unknown) {
-      const msg = e instanceof Error ? e.message : "unknown error";
-      console.warn("[Pass1] 재시도 예외:", msg);
-    }
+      pass1Result = tryParse(pass1Res);
+    } catch {}
   }
 
   if (!pass1Result || !pass1Result.success) {
     return NextResponse.json(
-      {
-        error: `[Pass1] ${pass1Result?.reason ?? "parse failed"}`,
-        detail: pass1Result?.detail,
-      },
+      { error: `[Pass1] ${pass1Result?.reason ?? "parse failed"}`, detail: (pass1Result as any)?.detail },
       { status: 500 }
     );
   }
 
   const draft = pass1Result.data;
-  console.log("[Pass1] ✅ 완료. body:", draft.body.length, "자");
 
-  // ── PASS 2: 인간화 ───────────────────────────
-  // Pass2 실패 시 Pass1 결과를 그대로 반환 (서비스 중단 방지)
-
+  // PASS2 (fail → return draft)
   try {
-    const pass2Res = await callOpenAI(
-      apiKey,
-      HUMANIZE_MODEL,
-      buildHumanizeSystemPrompt(),
-      buildHumanizeUserPrompt(draft)
-    );
-
-    if (!pass2Res.ok) {
-      console.warn("[Pass2] error", pass2Res.status, "→ Pass1 반환");
-      return NextResponse.json({ ...draft, humanized: false });
-    }
+    const pass2Res = await callOpenAI(apiKey, HUMANIZE_MODEL, buildHumanizeSystemPrompt(), buildHumanizeUserPrompt(draft));
+    if (!pass2Res.ok) return NextResponse.json({ ...draft, humanized: false });
 
     const pass2Data = JSON.parse(pass2Res.text);
     const pass2Text = extractOutputText(pass2Data);
-
-    if (!pass2Text) {
-      console.warn("[Pass2] 텍스트 없음 → Pass1 반환");
-      return NextResponse.json({ ...draft, humanized: false });
-    }
+    if (!pass2Text) return NextResponse.json({ ...draft, humanized: false });
 
     const pass2Result = parseAndValidate(pass2Text);
+    if (!pass2Result.success) return NextResponse.json({ ...draft, humanized: false });
 
-    if (!pass2Result.success) {
-      console.warn("[Pass2] 검증 실패", pass2Result.reason, "→ Pass1 반환");
-      return NextResponse.json({ ...draft, humanized: false });
-    }
-
-    console.log("[Pass2] ✅ 인간화 완료. body:", pass2Result.data.body.length, "자");
     return NextResponse.json({ ...pass2Result.data, humanized: true });
-
-  } catch (e: unknown) {
-    const msg = e instanceof Error ? e.message : "unknown error";
-    console.warn("[Pass2] 예외:", msg, "→ Pass1 반환");
+  } catch {
     return NextResponse.json({ ...draft, humanized: false });
   }
 }

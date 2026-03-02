@@ -329,6 +329,9 @@ async function copyToClipboard(text: string) {
   await navigator.clipboard.writeText(text);
 }
 
+export default function Page() {
+
+  
   // 🔒 접근 비밀번호 게이트
   const [authOk, setAuthOk] = useState(false);
   const [accessPw, setAccessPw] = useState("");
@@ -359,7 +362,7 @@ async function copyToClipboard(text: string) {
     }
   }
 
-export default function Page() {
+  
   const [apiKey, setApiKey]       = useState("");
   const [region, setRegion]       = useState("송도");
   const [subject, setSubject]     = useState<(typeof SUBJECTS)[number]["value"]>("eng");
