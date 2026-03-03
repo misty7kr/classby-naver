@@ -673,9 +673,12 @@ export default function Page() {
                   </button>
                 ))}
               </div>
+              <p className="mt-4 text-xs text-neutral-500 text-center">
+                AI 특성상 가끔 에러가 날 수 있어요. 그럴 땐 여유롭게 한 번 더 눌러주세요 😊
+              </p>
               <button
                 onClick={generate} disabled={loading}
-                className="mt-4 w-full rounded-xl bg-white text-black font-semibold py-3 disabled:opacity-60"
+                className="mt-2 w-full rounded-xl bg-white text-black font-semibold py-3 disabled:opacity-60"
               >
                 {loading ? "생성 중..." : "선택한 주제로 글 생성하기"}
               </button>
