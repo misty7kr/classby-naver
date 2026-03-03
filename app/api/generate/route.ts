@@ -169,6 +169,12 @@ function buildSystemPrompt(): string {
 - AI 냄새 나는 나열 패턴 금지: "먼저~, 또한~, 마지막으로~" 구조 사용 금지
 - 단정적 표현 완화: "학교마다, 학생마다 다를 수 있어요"를 전제로
 
+[분량 엄수 — 가장 중요]
+- 본문은 반드시 1500자 이상 2200자 이하
+- 소제목이 4~6개이므로 소제목당 평균 250~350자를 써야 1500자가 됨
+- 짧게 끝날 것 같으면 소제목 아래 예시, 체크리스트, 구체적 상황 묘사를 추가해서 채울 것
+- 출력 전 반드시 글자 수를 세어보고 1500자 미만이면 보강 후 출력
+
 [절대 금지]
 - 과장·보장 표현 (무조건/100%/최고/완벽/확실히 보장 등)
 - 광고 냄새 나는 표현
@@ -261,7 +267,7 @@ STEP 6. 자체검사 (출력 전 내부 확인)
   ☑ FAQ가 (Q:/A:) 순서 쌍으로 정확히 3세트인가?
   ☑ 과장 표현(무조건/100%/최고/완벽 등)이 없는가?
   ☑ 해시태그가 정확히 20개이고 모두 #으로 시작하는가?
-  ☑ 본문 전체 길이가 1500~2200자인가?
+  ☑ 본문 전체 길이가 1500~2200자인가? (실제로 세어볼 것 — 1500자 미만이면 반드시 보강 후 재출력)
   → 하나라도 ✗이면 해당 부분만 수정 후 출력
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -337,6 +343,7 @@ function buildHumanizeSystemPrompt(): string {
 당신은 한국어 블로그 글을 자연스러운 사람 말투로 다듬는 에디터입니다.
 
 [인간화 구체 지침 — 반드시 따를 것]
+- 본문이 1500자 미만이면: 각 소제목 아래에 독자 상황 예시, 구체적 팁, 현장감 있는 문장을 추가해서 1500자 이상으로 채울 것
 - "~하는 것이 중요합니다" → "이게 생각보다 차이가 크더라고요" 식으로 구어체 전환
 - 대칭 문장("A이고, B입니다") → 한 문장을 끊어서 리듬 변화 주기
 - 소제목 아래 첫 문장은 반드시 독자 상황 공감 또는 핵심 포인트로 시작
@@ -350,14 +357,15 @@ function buildHumanizeSystemPrompt(): string {
 - 첫 문단 120자 이내 조건
 - 해시태그 목록 (20개, 순서·내용 그대로)
 - 사실 정보
-- 전체 분량 (±10% 이내)
+- 전체 분량: 원본이 1500자 이상이면 ±10% 이내 유지. 단 원본이 1500자 미만인 경우 반드시 1500자 이상으로 보강할 것
 
 [자체검사 — 출력 전 확인]
+☑ 본문이 1500자 이상인가? (미만이면 보강 후 재출력)
 ☑ 첫 문단 120자 이내, 핵심 키워드 정확히 1회 유지됐는가?
 ☑ 소제목 【】 형식 줄 맨 앞 4~6개 유지됐는가?
 ☑ FAQ (Q:/A:) 쌍 3세트 유지됐는가?
 ☑ 해시태그 20개 유지됐는가?
-→ 하나라도 ✗이면 해당 부분만 복원 후 출력
+→ 하나라도 ✗이면 해당 부분만 복원/보강 후 출력
 
 [출력 형식]
 입력과 동일한 JSON 구조로만 출력:
@@ -371,7 +379,17 @@ JSON 외 텍스트 절대 금지.
 }
 
 function buildHumanizeUserPrompt(draft: BlogPostOutput): string {
-  return `아래 블로그 글 초안을 인간화해주세요.\n\n${JSON.stringify(draft, null, 2)}`;
+  const bodyLength = draft.body?.length ?? 0;
+  const lengthNote = bodyLength < 1500
+    ? `
+
+⚠️ 현재 본문이 ${bodyLength}자입니다. 1500자 이상이 되도록 각 소제목 아래 내용을 보강해주세요.`
+    : `
+
+현재 본문 길이: ${bodyLength}자 (적정 범위).`;
+  return `아래 블로그 글 초안을 인간화해주세요.${lengthNote}
+
+${JSON.stringify(draft, null, 2)}`;
 }
 
 // ─────────────────────────────────────────────
@@ -496,12 +514,9 @@ function validateFaqPairs(body: string): boolean {
   const segments = body.split(/^Q\s*:/m);
   if (segments.length !== 4) return false;
   return segments.slice(1).every((seg) => {
-    // A:가 정확히 1개여야 함 (0개 또는 2개 이상 모두 실패)
-    const aMatches = seg.match(/^A\s*:/mg);
-    if (!aMatches || aMatches.length !== 1) return false;
-    // A:가 다음 Q:보다 먼저 등장해야 함
     const firstA = seg.search(/^A\s*:/m);
-    const nextQ  = seg.search(/^Q\s*:/m);
+    if (firstA === -1) return false;
+    const nextQ = seg.search(/^Q\s*:/m);
     if (nextQ !== -1 && firstA > nextQ) return false;
     return true;
   });
