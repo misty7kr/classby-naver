@@ -522,10 +522,27 @@ function validateFaqPairs(body: string): boolean {
   });
 }
 
+function extractJsonFromText(rawText: string): string | null {
+  // 1) 코드블록 안의 JSON 우선 추출
+  const codeBlock = rawText.match(/```(?:json)?\s*([\s\S]*?)```/i);
+  if (codeBlock?.[1]) {
+    const candidate = codeBlock[1].trim();
+    if (candidate.startsWith("{")) return candidate;
+  }
+  // 2) 첫 { ~ 마지막 } 사이 추출 (모델이 앞뒤에 설명 텍스트를 붙인 경우)
+  const first = rawText.indexOf("{");
+  const last  = rawText.lastIndexOf("}");
+  if (first !== -1 && last !== -1 && last > first) {
+    return rawText.slice(first, last + 1);
+  }
+  return null;
+}
+
 function parseAndValidate(rawText: string, coreKeyword?: string): ParseResult {
-  const clean = rawText.replace(/^```json\s*/i, "").replace(/```\s*$/, "").trim();
+  const extracted = extractJsonFromText(rawText);
+  if (!extracted) return { success: false, reason: "JSON parse failed: no JSON object found" };
   let parsed: unknown;
-  try { parsed = JSON.parse(clean); } catch { return { success: false, reason: "JSON parse failed" }; }
+  try { parsed = JSON.parse(extracted); } catch { return { success: false, reason: "JSON parse failed" }; }
   if (!parsed || typeof parsed !== "object") return { success: false, reason: "Not an object" };
 
   const p = parsed as any;
