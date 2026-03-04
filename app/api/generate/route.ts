@@ -20,20 +20,23 @@ type Goal      = "school_exam" | "csat" | "performance" | "descriptive";
 type ApiMode = "openai" | "anthropic" | "hybrid";
 
 type Payload = {
+  serviceType?: "academy" | "studyhall"; // 서비스 타입
   apiMode: ApiMode;
-  openaiKey?: string;    // apiMode가 openai 또는 hybrid일 때 필수
-  anthropicKey?: string; // apiMode가 anthropic 또는 hybrid일 때 필수
-  pass1Model?: string;   // Pass1 모델 (미입력 시 provider별 기본값)
+  openaiKey?: string;
+  anthropicKey?: string;
+  pass1Model?: string;
   input: {
     region: string;
-    subject: Subject | string;
-    gradeBand: GradeBand | string;
-    goal: Goal | string;
-    season: string;
+    subject?: Subject | string;
+    gradeBand?: GradeBand | string;
+    goal?: Goal | string;
+    season?: string;
     schoolName?: string;
+    shGrade?: string;   // 관독 학년 레이블
+    shGoal?: string;    // 관독 목표 레이블
     topicTitle: string;
     intent: Intent | string;
-    includeAcademy?: boolean; // 키워드에 "학원" 포함 여부
+    includeAcademy?: boolean;
   };
 };
 
@@ -170,6 +173,71 @@ function makeCoreKeyword(input: Payload["input"]): string {
 // ─────────────────────────────────────────────
 // Pass1 prompts
 // ─────────────────────────────────────────────
+
+
+// ─────────────────────────────────────────────
+// 관독 전용 Prompts
+// ─────────────────────────────────────────────
+
+function buildStudyHallSystemPrompt(): string {
+  return `
+당신은 관리형독서실 전문 네이버 블로그 콘텐츠 작가입니다.
+관리형독서실은 학원이 아닙니다. 학생이 스스로 공부하면서 전과목 학습 관리, 교재 선정, 학습인증, 질문 해결을 지원받는 공간입니다.
+
+[핵심 원칙]
+- 입시 전략·수능 최저·전형 분석 등 정확한 수치가 필요한 내용은 절대 쓰지 않는다.
+- 학습 관리, 공부 습관, 루틴, 멘탈, 환경, 교재 선정에 집중한다.
+- 학부모의 현실적인 고민에 공감하며 답한다.
+
+[문장 규칙]
+- 자연스러운 구어체: "~거든요", "~더라고요", "~해요"
+- AI 냄새 절대 금지: "먼저~, 또한~, 마지막으로~" 나열 구조 사용 금지
+- 이모지(emoji) 사용 절대 금지
+- 과장·보장 표현 금지
+
+[구조]
+- 소제목: [소제목] 대괄호 형식, 4~6개
+- FAQ: Q: / A: 형식, 3~4쌍
+- 본문 길이: 1200~3500자
+
+[출력 형식]
+반드시 아래 JSON만 출력. 마크다운 코드블록(\`\`\`) 포함 그 외 텍스트 절대 금지:
+{
+  "titles": [string 5개],
+  "body": "본문 (줄바꿈 \n 유지)",
+  "hashtags": [string 20개]
+}
+
+[제목 규칙]
+- 5개 모두 관리형독서실 관련 키워드 포함
+- 숫자 포함 시 클릭률 상승
+- 학부모가 공감할 현실적인 표현 사용
+  `.trim();
+}
+
+function buildStudyHallUserPrompt(input: Payload["input"]): string {
+  const gradeLabel = input.shGrade ?? "고2";
+  const goalLabel  = input.shGoal  ?? "내신";
+  const coreKw     = `${input.region} ${gradeLabel} 관리형독서실 ${goalLabel}`;
+
+  return `
+[입력 정보]
+지역: ${input.region}
+대상 학년: ${gradeLabel}
+목표: ${goalLabel}
+핵심 키워드: ${coreKw}
+주제: ${input.topicTitle}
+
+[작성 지침]
+1. 첫 문단(2~3문장): 핵심 키워드 "${coreKw}"를 자연스럽게 1회 포함. 150자 이내.
+2. 본문: 관리형독서실의 학습관리·교재선정·학습인증·질문해결·루틴 관리 관점에서 작성.
+3. ${gradeLabel} 학생과 학부모의 현실적 고민을 중심으로 구체적으로 서술.
+4. 소제목 4~6개, FAQ 3~4쌍 포함.
+5. 해시태그: #${input.region}관리형독서실, #${input.region}독서실, #${gradeLabel}독서실 등 지역+학년+관독 조합 포함.
+
+JSON만 출력.
+  `.trim();
+}
 
 function buildHomefeedSystemPrompt(): string {
   return `
@@ -757,10 +825,18 @@ export async function POST(req: Request) {
   const resolvedPass1Model = pass1Model?.trim() ||
     (pass1IsAnthropic ? ANTHROPIC_PASS1_DEFAULT : OPENAI_PASS1_DEFAULT);
 
+  const serviceType = body.serviceType ?? "academy";
+  const isStudyHall = serviceType === "studyhall";
   const isHomefeed = input.intent === "homefeed";
-  const coreKeyword = isHomefeed ? undefined : makeCoreKeyword(input);
-  const sysPr = isHomefeed ? buildHomefeedSystemPrompt() : buildSystemPrompt();
-  const usrPr = isHomefeed ? buildHomefeedUserPrompt(input) : buildUserPrompt(input);
+
+  // 관독 전용 처리
+  const coreKeyword = isStudyHall
+    ? `${input.region} ${input.shGrade ?? ""} 관리형독서실 ${input.shGoal ?? ""}`.replace(/\s+/g, " ").trim()
+    : isHomefeed ? undefined : makeCoreKeyword(input);
+  const sysPr = isStudyHall ? buildStudyHallSystemPrompt()
+    : isHomefeed ? buildHomefeedSystemPrompt() : buildSystemPrompt();
+  const usrPr = isStudyHall ? buildStudyHallUserPrompt(input)
+    : isHomefeed ? buildHomefeedUserPrompt(input) : buildUserPrompt(input);
 
   async function runPass1(temperature: number, userPrompt: string): Promise<LLMResult> {
     return pass1IsAnthropic
@@ -771,9 +847,8 @@ export async function POST(req: Request) {
   function tryParse(res: LLMResult): ParseResult {
     const text = extractText(res.text, pass1IsAnthropic);
     if (!text) return { success: false, reason: "No output text extracted" };
-    return isHomefeed
-      ? parseAndValidateHomefeed(text)
-      : parseAndValidate(text, coreKeyword);
+    if (isHomefeed) return parseAndValidateHomefeed(text);
+    return parseAndValidate(text, coreKeyword);
   }
 
   // Pass1 첫 시도
