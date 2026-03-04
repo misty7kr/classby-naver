@@ -171,8 +171,6 @@ function makeCoreKeyword(input: Payload["input"]): string {
 // Pass1 prompts
 // ─────────────────────────────────────────────
 
-}
-
 function buildHomefeedSystemPrompt(): string {
   return `
 당신은 네이버 블로그 홈피드 전문 콘텐츠 작가입니다.

@@ -275,6 +275,9 @@ function pickTopics(season: Season, vars: Record<string, string>, includeSchool:
       c.tags.forEach((x) => usedTags.add(x));
     }
   });
+  // fallback 불필요 — 이미 evergreen 포함된 풀에서 뽑았음
+  return picked.slice(0, 12);
+}
 
 function intentLabel(intent: Intent) {
   return { info: "정보형", problem: "문제해결형", compare: "비교형", consult: "상담형", homefeed: "홈피드형" }[intent] ?? intent;
