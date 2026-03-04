@@ -68,7 +68,7 @@ const ANTHROPIC_PASS1_DEFAULT  = "claude-sonnet-4-5";
 const OPENAI_PASS2_MODEL       = "gpt-4.1-mini";
 const ANTHROPIC_PASS2_MODEL    = "claude-haiku-4-5";
 
-const MIN_BODY_LENGTH    = 1500;
+const MIN_BODY_LENGTH    = 1300;
 const MAX_BODY_LENGTH    = 2600;
 const MAX_FIRST_PARA_LEN = 150;
 
@@ -265,8 +265,8 @@ function buildSystemPrompt(): string {
 - 단정적 표현 완화: "학교마다, 학생마다 다를 수 있어요"를 전제로
 
 [분량 엄수 — 가장 중요]
-- 본문은 반드시 1500자 이상 2500자 이하
-- 소제목이 4~6개이므로 소제목당 평균 250~400자를 써야 1500자가 됨
+- 본문은 반드시 1300자 이상 2500자 이하
+- 소제목이 4~6개이므로 소제목당 평균 220~400자를 써야 1300자가 됨
 - 짧게 끝날 것 같으면 소제목 아래 예시, 체크리스트, 구체적 상황 묘사를 추가해서 채울 것
 - 출력 전 반드시 글자 수를 세어보고 1500자 미만이면 보강 후 출력
 
