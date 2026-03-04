@@ -161,9 +161,9 @@ const INTENT_GUIDE: Record<string, string> = {
 // ─────────────────────────────────────────────
 
 function makeCoreKeyword(input: Payload["input"]): string {
-  const subject = SUBJECT_LABEL[input.subject] ?? input.subject;
-  const grade   = GRADE_LABEL[input.gradeBand] ?? input.gradeBand;
-  const goal    = GOAL_LABEL[input.goal] ?? input.goal;
+  const subject = SUBJECT_LABEL[input.subject as keyof typeof SUBJECT_LABEL] ?? input.subject;
+  const grade   = GRADE_LABEL[input.gradeBand as keyof typeof GRADE_LABEL] ?? input.gradeBand;
+  const goal    = GOAL_LABEL[input.goal as keyof typeof GOAL_LABEL] ?? input.goal;
   const subjectPart = input.includeAcademy ? `${subject}학원` : subject;
   return input.schoolName?.trim()
     ? `${input.region} ${input.schoolName.trim()} ${grade} ${subjectPart} ${goal}`
@@ -284,7 +284,7 @@ function buildHomefeedSystemPrompt(): string {
 
 function buildHomefeedUserPrompt(input: Payload["input"]): string {
   const subjectLabel = SUBJECT_LABEL[input.subject] ?? input.subject;
-  const gradeLabel   = GRADE_LABEL[input.gradeBand] ?? input.gradeBand;
+  const gradeLabel = GRADE_LABEL[input.gradeBand as keyof typeof GRADE_LABEL] ?? input.gradeBand;
   const intentGuide  = INTENT_GUIDE["homefeed"];
   const schoolPart   = input.schoolName?.trim() ? `학교명: ${input.schoolName.trim()}\n` : "";
 
@@ -360,8 +360,8 @@ function buildSystemPrompt(): string {
 
 function buildUserPrompt(input: Payload["input"]): string {
   const subjectLabel = SUBJECT_LABEL[input.subject] ?? input.subject;
-  const gradeLabel   = GRADE_LABEL[input.gradeBand] ?? input.gradeBand;
-  const goalLabel    = GOAL_LABEL[input.goal] ?? input.goal;
+  const gradeLabel = GRADE_LABEL[input.gradeBand as keyof typeof GRADE_LABEL] ?? input.gradeBand;
+  const goalLabel  = GOAL_LABEL[input.goal as keyof typeof GOAL_LABEL] ?? input.goal;
   const intentGuide  = INTENT_GUIDE[input.intent] ?? `[글 타입: ${input.intent}]`;
   const schoolPart   = input.schoolName?.trim() ? `학교명: ${input.schoolName.trim()}\n` : "";
   const coreKeyword  = makeCoreKeyword(input);
