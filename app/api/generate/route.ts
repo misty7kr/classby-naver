@@ -72,7 +72,7 @@ const ANTHROPIC_PASS1_DEFAULT  = "claude-sonnet-4-5";
 const OPENAI_PASS2_MODEL       = "gpt-4.1-mini";
 const ANTHROPIC_PASS2_MODEL    = "claude-haiku-4-5";
 
-const MIN_BODY_LENGTH    = 1200;
+const MIN_BODY_LENGTH    = 1100;
 const MAX_BODY_LENGTH    = 4000;
 const MAX_FIRST_PARA_LEN = 150;
 
@@ -198,7 +198,7 @@ function buildStudyHallSystemPrompt(): string {
 [구조]
 - 소제목: [소제목] 대괄호 형식, 4~6개
 - FAQ: Q: / A: 형식, 3~4쌍
-- 본문 길이: 1200~3500자
+- 본문 길이: 1100~3500자
 
 [출력 형식]
 반드시 아래 JSON만 출력. 마크다운 코드블록(\`\`\`) 포함 그 외 텍스트 절대 금지:
@@ -467,9 +467,12 @@ STEP 6. 자체검사 (출력 전 내부 확인)
 function buildRepairPrompt(
   input: Payload["input"],
   detail: ValidationDetail,
-  previousOutput: string
+  previousOutput: string,
+  serviceType?: string
 ): string {
-  const coreKeyword = makeCoreKeyword(input);
+  const coreKeyword = serviceType === "studyhall"
+    ? `${input.region} ${input.shGrade ?? ""} 관리형독서실 ${input.shGoal ?? ""}`.replace(/\s+/g, " ").trim()
+    : makeCoreKeyword(input);
   const failures: string[] = [];
 
   if (!detail.keywordOk)
@@ -869,7 +872,7 @@ export async function POST(req: Request) {
   if (!pass1Result.success) {
     const prevText = extractText(pass1Res.text, pass1IsAnthropic) ?? "";
     const repairPrompt = pass1Result.detail && prevText
-      ? buildRepairPrompt(input, pass1Result.detail, prevText)
+      ? buildRepairPrompt(input, pass1Result.detail, prevText, serviceType)
       : usrPr;
 
     try {
