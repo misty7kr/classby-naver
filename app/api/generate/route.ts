@@ -283,8 +283,8 @@ function buildHomefeedSystemPrompt(): string {
 }
 
 function buildHomefeedUserPrompt(input: Payload["input"]): string {
-  const subjectLabel = SUBJECT_LABEL[input.subject] ?? input.subject;
-  const gradeLabel = GRADE_LABEL[input.gradeBand as keyof typeof GRADE_LABEL] ?? input.gradeBand;
+  const subjectLabel = SUBJECT_LABEL[input.subject as keyof typeof SUBJECT_LABEL] ?? input.subject;
+  const gradeLabel   = GRADE_LABEL[input.gradeBand as keyof typeof GRADE_LABEL] ?? input.gradeBand;
   const intentGuide  = INTENT_GUIDE["homefeed"];
   const schoolPart   = input.schoolName?.trim() ? `학교명: ${input.schoolName.trim()}\n` : "";
 
@@ -359,9 +359,9 @@ function buildSystemPrompt(): string {
 }
 
 function buildUserPrompt(input: Payload["input"]): string {
-  const subjectLabel = SUBJECT_LABEL[input.subject] ?? input.subject;
-  const gradeLabel = GRADE_LABEL[input.gradeBand as keyof typeof GRADE_LABEL] ?? input.gradeBand;
-  const goalLabel  = GOAL_LABEL[input.goal as keyof typeof GOAL_LABEL] ?? input.goal;
+  const subjectLabel = SUBJECT_LABEL[input.subject as keyof typeof SUBJECT_LABEL] ?? input.subject;
+  const gradeLabel   = GRADE_LABEL[input.gradeBand as keyof typeof GRADE_LABEL] ?? input.gradeBand;
+  const goalLabel    = GOAL_LABEL[input.goal as keyof typeof GOAL_LABEL] ?? input.goal;
   const intentGuide  = INTENT_GUIDE[input.intent] ?? `[글 타입: ${input.intent}]`;
   const schoolPart   = input.schoolName?.trim() ? `학교명: ${input.schoolName.trim()}\n` : "";
   const coreKeyword  = makeCoreKeyword(input);
