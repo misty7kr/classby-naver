@@ -713,6 +713,93 @@ export default function Page() {
             {activeTab === "studyhall" ? (
               <>
                 <h2 className="text-lg font-semibold mb-4">1) 관리형독서실 설정</h2>
+
+                {/* API 모드 선택 */}
+                <div className="mb-4">
+                  <label className="block text-sm text-neutral-300 mb-2">API 모드</label>
+                  <div className="grid grid-cols-1 gap-2">
+                    {API_MODE_OPTIONS.map((opt) => (
+                      <button
+                        key={opt.value}
+                        onClick={() => setApiMode(opt.value)}
+                        className={[
+                          "rounded-xl border px-3 py-2.5 text-left transition",
+                          apiMode === opt.value
+                            ? "border-white bg-neutral-800"
+                            : "border-neutral-700 bg-neutral-950 hover:bg-neutral-900",
+                        ].join(" ")}
+                      >
+                        <div className="flex items-center gap-2">
+                          <span className="font-medium text-sm">{opt.label}</span>
+                          {opt.badge && (
+                            <span className="text-xs bg-amber-900/60 text-amber-300 border border-amber-700 rounded-md px-1.5 py-0.5">
+                              {opt.badge}
+                            </span>
+                          )}
+                        </div>
+                        <div className="text-xs text-neutral-400 mt-0.5">{opt.desc}</div>
+                        {apiMode === opt.value && opt.detail && (
+                          <div className="text-xs text-neutral-500 mt-1 leading-relaxed">{opt.detail}</div>
+                        )}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* API Key 입력 */}
+                <div className="space-y-3 mb-4">
+                  {(apiMode === "openai" || apiMode === "hybrid") && (
+                    <div>
+                      <label className="block text-sm text-neutral-300 mb-1">OpenAI API Key</label>
+                      <input
+                        type="password" value={openaiKey}
+                        onChange={(e) => setOpenaiKey(e.target.value)}
+                        placeholder="sk-..."
+                        className="w-full rounded-xl bg-neutral-950 border border-neutral-800 px-3 py-2"
+                      />
+                      {apiMode !== "hybrid" && (
+                        <div className="mt-1">
+                          <label className="block text-xs text-neutral-400 mb-1">Pass1 모델</label>
+                          <select
+                            value={openaiModel}
+                            onChange={(e) => setOpenaiModel(e.target.value as OpenAIModel)}
+                            className="w-full rounded-xl bg-neutral-950 border border-neutral-800 px-3 py-1.5 text-sm"
+                          >
+                            {OPENAI_MODELS.map((m) => (
+                              <option key={m.value} value={m.value}>{m.label}</option>
+                            ))}
+                          </select>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                  {(apiMode === "anthropic" || apiMode === "hybrid") && (
+                    <div>
+                      <label className="block text-sm text-neutral-300 mb-1">Anthropic API Key</label>
+                      <input
+                        type="password" value={anthropicKey}
+                        onChange={(e) => setAnthropicKey(e.target.value)}
+                        placeholder="sk-ant-..."
+                        className="w-full rounded-xl bg-neutral-950 border border-neutral-800 px-3 py-2"
+                      />
+                      {apiMode === "anthropic" && (
+                        <div className="mt-1">
+                          <label className="block text-xs text-neutral-400 mb-1">Pass1 모델</label>
+                          <select
+                            value={anthropicModel}
+                            onChange={(e) => setAnthropicModel(e.target.value as AnthropicModel)}
+                            className="w-full rounded-xl bg-neutral-950 border border-neutral-800 px-3 py-1.5 text-sm"
+                          >
+                            {ANTHROPIC_MODELS.map((m) => (
+                              <option key={m.value} value={m.value}>{m.label}</option>
+                            ))}
+                          </select>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+
                 {/* 지역 */}
                 <div className="mb-4">
                   <label className="block text-sm text-neutral-300 mb-1">지역</label>
