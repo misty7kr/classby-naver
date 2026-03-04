@@ -8,7 +8,7 @@ export const runtime = "nodejs";
 // Types
 // ─────────────────────────────────────────────
 
-type Intent    = "info" | "problem" | "compare" | "consult";
+type Intent    = "info" | "problem" | "compare" | "consult" | "homefeed";
 type Subject   = "kor" | "eng" | "math" | "sci" | "soc" | "essay" | "coding";
 type GradeBand = "elem" | "mid" | "high";
 type Goal      = "school_exam" | "csat" | "performance" | "descriptive";
@@ -72,6 +72,10 @@ const MIN_BODY_LENGTH    = 1500;
 const MAX_BODY_LENGTH    = 2600;
 const MAX_FIRST_PARA_LEN = 150;
 
+// 홈피드형 전용 상수
+const HOMEFEED_MIN_BODY  = 600;
+const HOMEFEED_MAX_BODY  = 1400;
+
 // ─────────────────────────────────────────────
 // Label Maps
 // ─────────────────────────────────────────────
@@ -134,6 +138,18 @@ const INTENT_GUIDE: Record<string, string> = {
 - CTA는 마지막에 한 번만, 부드럽게
 - FAQ: 상담 전 자주 하는 질문 위주
 `.trim(),
+
+  homefeed: `
+[글 타입: 홈피드 공감형]
+독자: 네이버 홈피드를 스크롤하다 제목에 멈춘 학부모. 검색하러 온 게 아니라 피드에서 발견한 상태.
+      "맞아 우리 애 얘기네" 싶으면 끝까지 읽는다.
+- 도입: 학부모가 일상에서 겪는 상황을 1~2문장으로 정확히 짚기 (공감부터)
+- 문장: 1~2문장씩 끊어서 쓰기. 짧은 문장과 약간 긴 문장을 번갈아 리듬 만들기
+- 소제목: 없거나 최대 2~3개. 쓴다면 [ ] 대괄호 형식 사용
+- FAQ 없음. 대신 글 끝에 독자에게 질문 1개로 마무리 (댓글·공감 유도)
+- 전체 분량: 600~1300자. 짧아도 괜찮다. 밀도가 중요하다.
+- 절대 금지: "먼저~, 또한~, 마지막으로~" 나열 / AI 냄새 나는 정형 구조
+`.trim(),
 };
 
 // ─────────────────────────────────────────────
@@ -145,13 +161,92 @@ function makeCoreKeyword(input: Payload["input"]): string {
   const grade   = GRADE_LABEL[input.gradeBand] ?? input.gradeBand;
   const goal    = GOAL_LABEL[input.goal] ?? input.goal;
   return input.schoolName?.trim()
-    ? `${input.region} ${input.schoolName.trim()} ${grade} ${subject} ${goal}`
-    : `${input.region} ${grade} ${subject} ${goal}`;
+    ? `${input.region} ${input.schoolName.trim()} ${grade} ${subject}학원 ${goal}`
+    : `${input.region} ${grade} ${subject}학원 ${goal}`;
 }
 
 // ─────────────────────────────────────────────
 // Pass1 prompts
 // ─────────────────────────────────────────────
+
+}
+
+function buildHomefeedSystemPrompt(): string {
+  return `
+당신은 네이버 블로그 홈피드 전문 콘텐츠 작가입니다.
+홈피드형 글은 검색형과 다릅니다. 검색이 아니라 피드에서 발견되는 글입니다.
+
+[핵심 원칙]
+- 읽고 싶어지는 글. 스크롤하다 멈추는 글.
+- "맞아 우리 애 얘기네" 싶은 공감이 클릭을 만든다.
+
+[문장 규칙 — 반드시 따를 것]
+- 문장은 짧게. 1~2문장이면 줄 바꾸기.
+- 긴 설명 대신 상황 묘사. "열심히 한다고 했는데 성적이 그대로였다."
+- 구어체 자연스럽게. "~거든요", "~더라고요", "~해요"
+- AI 냄새 절대 금지: "먼저~, 또한~, 마지막으로~" 구조 사용 금지
+- 과장·보장 표현 금지
+
+[분량]
+- 본문 600~1300자. 짧아도 밀도가 있으면 충분하다.
+
+[소제목]
+- 없어도 된다. 넣는다면 [ ] 대괄호 형식. 최대 2~3개.
+- 【】형식 절대 사용 금지.
+
+[글 끝 마무리 — 필수]
+- 반드시 독자에게 질문 1개로 끝내기.
+- 예: "지금 어떤 과목이 가장 고민이세요?"
+- 공감·댓글을 자연스럽게 유도하는 질문이어야 함.
+
+[출력 형식]
+반드시 아래 JSON만 출력. 마크다운 코드블록(\`\`\`) 포함 그 외 텍스트 절대 금지:
+{
+  "titles": [string 5개],
+  "body": "본문 (줄바꿈 \\n 유지)",
+  "hashtags": [string 20개]
+}
+
+[제목 규칙 — 홈피드형]
+- 5개 중 3개 이상은 호기심 유발형으로: 결과를 암시하되 답은 안 보여주기
+- 숫자가 들어가면 클릭률이 높아진다
+- 예: "수학 열심히 하는데 성적 그대로인 아이의 공통점", "이 시기에 상담 오는 학부모들의 이유"
+  `.trim();
+}
+
+function buildHomefeedUserPrompt(input: Payload["input"]): string {
+  const subjectLabel = SUBJECT_LABEL[input.subject] ?? input.subject;
+  const gradeLabel   = GRADE_LABEL[input.gradeBand] ?? input.gradeBand;
+  const intentGuide  = INTENT_GUIDE["homefeed"];
+  const schoolPart   = input.schoolName?.trim() ? `학교명: ${input.schoolName.trim()}\n` : "";
+
+  const commercialTags = input.schoolName?.trim()
+    ? `#${input.region}${subjectLabel}학원, #${input.region}${gradeLabel}${subjectLabel}, #${input.region}학원추천`
+    : `#${input.region}${subjectLabel}학원, #${input.region}${gradeLabel}${subjectLabel}, #${input.region}학원추천`;
+
+  return `
+[입력 정보]
+지역: ${input.region}
+${schoolPart}과목: ${subjectLabel}
+학년군: ${gradeLabel}
+시즌: ${input.season}
+선택 주제: ${input.topicTitle}
+
+${intentGuide}
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+[작업 지침]
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+1. 첫 문장: 학부모가 일상에서 겪는 상황을 정확히 짚기. 질문 또는 상황 묘사로 시작.
+2. 본문: 짧은 문장 위주. 줄바꿈 자주. 공감 → 원인 or 상황 → 해결 힌트 순서.
+3. 글 끝: 반드시 독자에게 질문 1개로 마무리 (댓글 유도).
+4. 전체 600~1300자 이내.
+
+[해시태그 필수 포함]
+${commercialTags}
+나머지는 관련 교육·학습 태그로 채워 총 20개.
+  `.trim();
+}
 
 function buildSystemPrompt(): string {
   return `
@@ -538,6 +633,43 @@ function extractJsonFromText(rawText: string): string | null {
   return null;
 }
 
+function parseAndValidateHomefeed(rawText: string): ParseResult {
+  const extracted = extractJsonFromText(rawText);
+  if (!extracted) return { success: false, reason: "JSON parse failed: no JSON object found" };
+  let parsed: unknown;
+  try { parsed = JSON.parse(extracted); } catch { return { success: false, reason: "JSON parse failed" }; }
+  if (!parsed || typeof parsed !== "object") return { success: false, reason: "Not an object" };
+
+  const p = parsed as any;
+
+  const okTitles =
+    Array.isArray(p.titles) && p.titles.length === 5 &&
+    p.titles.every((t: any) => typeof t === "string" && t.trim());
+
+  const bodyLength = typeof p.body === "string" ? p.body.trim().length : 0;
+  const okBody = bodyLength >= HOMEFEED_MIN_BODY && bodyLength <= HOMEFEED_MAX_BODY;
+
+  const okTags =
+    Array.isArray(p.hashtags) && p.hashtags.length === 20 &&
+    p.hashtags.every((h: any) => typeof h === "string" && h.trim().startsWith("#"));
+
+  // 글 끝 질문 확인 (마지막 100자 안에 "?" 포함)
+  const tail = typeof p.body === "string" ? p.body.trim().slice(-100) : "";
+  const okClosingQuestion = tail.includes("?");
+
+  const detail: ValidationDetail = {
+    titlesOk: okTitles, bodyOk: okBody, bodyLength,
+    hashtagsOk: okTags, keywordOk: true,
+    faqOk: okClosingQuestion, headingsOk: true,
+    firstParaChecked: "",
+  };
+
+  if (!okTitles || !okBody || !okTags || !okClosingQuestion)
+    return { success: false, reason: "Validation failed", detail };
+
+  return { success: true, data: p as BlogPostOutput };
+}
+
 function parseAndValidate(rawText: string, coreKeyword?: string): ParseResult {
   const extracted = extractJsonFromText(rawText);
   if (!extracted) return { success: false, reason: "JSON parse failed: no JSON object found" };
@@ -622,9 +754,10 @@ export async function POST(req: Request) {
   const resolvedPass1Model = pass1Model?.trim() ||
     (pass1IsAnthropic ? ANTHROPIC_PASS1_DEFAULT : OPENAI_PASS1_DEFAULT);
 
-  const coreKeyword = makeCoreKeyword(input);
-  const sysPr = buildSystemPrompt();
-  const usrPr = buildUserPrompt(input);
+  const isHomefeed = input.intent === "homefeed";
+  const coreKeyword = isHomefeed ? undefined : makeCoreKeyword(input);
+  const sysPr = isHomefeed ? buildHomefeedSystemPrompt() : buildSystemPrompt();
+  const usrPr = isHomefeed ? buildHomefeedUserPrompt(input) : buildUserPrompt(input);
 
   async function runPass1(temperature: number, userPrompt: string): Promise<LLMResult> {
     return pass1IsAnthropic
@@ -635,7 +768,9 @@ export async function POST(req: Request) {
   function tryParse(res: LLMResult): ParseResult {
     const text = extractText(res.text, pass1IsAnthropic);
     if (!text) return { success: false, reason: "No output text extracted" };
-    return parseAndValidate(text, coreKeyword);
+    return isHomefeed
+      ? parseAndValidateHomefeed(text)
+      : parseAndValidate(text, coreKeyword);
   }
 
   // Pass1 첫 시도

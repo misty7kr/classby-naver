@@ -6,7 +6,7 @@ type Season =
   | "evergreen" | "exam_6w" | "exam_2w" | "exam_post"
   | "vac_4w" | "vac_in" | "vac_post";
 
-type Intent = "info" | "problem" | "compare" | "consult";
+type Intent = "info" | "problem" | "compare" | "consult" | "homefeed";
 
 // apiMode:
 //   "openai"    → Pass1(GPT) + Pass2 인간화(GPT)
@@ -96,13 +96,13 @@ const ELEM_ALLOWED_SEASONS: Season[]   = ["evergreen", "vac_4w", "vac_in", "vac_
 const isExamSeason = (s: Season) => s === "exam_6w" || s === "exam_2w" || s === "exam_post";
 
 const MIX_12: Record<Season, Record<Intent, number>> = {
-  evergreen: { info: 4, problem: 4, compare: 3, consult: 1 },
-  exam_6w:   { info: 4, problem: 4, compare: 3, consult: 1 },
-  exam_2w:   { info: 3, problem: 5, compare: 2, consult: 2 },
-  exam_post: { info: 5, problem: 4, compare: 2, consult: 1 },
-  vac_4w:    { info: 4, problem: 3, compare: 3, consult: 2 },
-  vac_in:    { info: 3, problem: 4, compare: 2, consult: 3 },
-  vac_post:  { info: 5, problem: 3, compare: 2, consult: 2 },
+  evergreen: { info: 3, problem: 3, compare: 2, consult: 1, homefeed: 2 },
+  exam_6w:   { info: 3, problem: 3, compare: 2, consult: 1, homefeed: 2 },
+  exam_2w:   { info: 2, problem: 4, compare: 2, consult: 1, homefeed: 2 },
+  exam_post: { info: 4, problem: 3, compare: 2, consult: 1, homefeed: 2 },
+  vac_4w:    { info: 3, problem: 3, compare: 2, consult: 1, homefeed: 2 },
+  vac_in:    { info: 2, problem: 3, compare: 2, consult: 2, homefeed: 2 },
+  vac_post:  { info: 4, problem: 2, compare: 2, consult: 1, homefeed: 2 },
 };
 
 const TOPIC_TEMPLATES: TopicTemplate[] = [
@@ -201,6 +201,18 @@ const TOPIC_TEMPLATES: TopicTemplate[] = [
   { id: "sch-i-1", season: "exam_6w",   intent: "info",    needsSchool: true, titleTemplate: "{region} {school} {subject} 시험 대비, 범위 확정 전 준비법", tags: ["school", "scope"] },
   { id: "sch-p-1", season: "exam_2w",   intent: "problem", needsSchool: true, titleTemplate: "{region} {school} {subject} 시험 2주 전, 점수가 안 오를 때 먼저 볼 것", tags: ["school", "2w"] },
   { id: "sch-s-1", season: "exam_post", intent: "consult", needsSchool: true, titleTemplate: "{region} {school} 시험 후 점검 상담 체크리스트({subject})", tags: ["school", "cta-soft"] },
+  // 홈피드형 (공감형 · 모든 시즌 공용)
+  { id: "hf-1", season: "evergreen", intent: "homefeed", titleTemplate: "{subject} 열심히 하는데 성적이 그대로인 아이의 공통점", tags: ["hf-effort"] },
+  { id: "hf-2", season: "evergreen", intent: "homefeed", titleTemplate: "학원 보내는데 왜 점수가 안 오를까, 솔직하게 써봤어요", tags: ["hf-honest"] },
+  { id: "hf-3", season: "evergreen", intent: "homefeed", titleTemplate: "{grade} {subject}, 상담 오는 학부모들이 제일 많이 하는 말", tags: ["hf-consult"] },
+  { id: "hf-4", season: "evergreen", intent: "homefeed", titleTemplate: "오늘 수업에서 있었던 일 하나", tags: ["hf-story"] },
+  { id: "hf-5", season: "evergreen", intent: "homefeed", titleTemplate: "{subject} 잘하는 아이들에게 공통적으로 있는 것", tags: ["hf-common"] },
+  { id: "hf-6", season: "evergreen", intent: "homefeed", titleTemplate: "아이 성적표 받고 나서 드는 생각들", tags: ["hf-result"] },
+  { id: "hf-e1", season: "exam_6w",   intent: "homefeed", titleTemplate: "시험 6주 전, 지금 이 시기가 제일 중요한 이유", tags: ["hf-timing"] },
+  { id: "hf-e2", season: "exam_2w",   intent: "homefeed", titleTemplate: "시험 2주 전 학부모들이 가장 많이 하는 실수", tags: ["hf-mistake"] },
+  { id: "hf-e3", season: "exam_post", intent: "homefeed", titleTemplate: "시험 끝나고 쉬게 두는 게 맞을까요", tags: ["hf-after"] },
+  { id: "hf-v1", season: "vac_in",    intent: "homefeed", titleTemplate: "방학 특강, 솔직히 효과 있을까요", tags: ["hf-camp"] },
+  { id: "hf-v2", season: "vac_post",  intent: "homefeed", titleTemplate: "방학 끝나고 아이가 달라졌다는 분들의 공통점", tags: ["hf-after-vac"] },
 ];
 
 function autoSeason(): Season {
@@ -232,10 +244,14 @@ function shuffle<T>(arr: T[]): T[] {
 
 function pickTopics(season: Season, vars: Record<string, string>, includeSchool: boolean): TopicCard[] {
   const mix  = MIX_12[season];
-  const pool = TOPIC_TEMPLATES.filter((t) => t.season === season);
-  const byIntent: Record<Intent, TopicTemplate[]> = { info: [], problem: [], compare: [], consult: [] };
+  // 해당 시즌 + evergreen 풀을 합쳐서 사용 (homefeed는 evergreen으로 등록된 것 포함)
+  const pool = TOPIC_TEMPLATES.filter((t) => t.season === season || t.season === "evergreen");
+  const byIntent: Record<Intent, TopicTemplate[]> = { info: [], problem: [], compare: [], consult: [], homefeed: [] };
+  const seenIds = new Set<string>();
   for (const t of pool) {
     if (t.needsSchool && !includeSchool) continue;
+    if (seenIds.has(t.id)) continue;
+    seenIds.add(t.id);
     byIntent[t.intent].push(t);
   }
   const usedTags = new Set<string>();
@@ -259,20 +275,9 @@ function pickTopics(season: Season, vars: Record<string, string>, includeSchool:
       c.tags.forEach((x) => usedTags.add(x));
     }
   });
-  if (picked.length < 12 && season !== "evergreen") {
-    const extra = TOPIC_TEMPLATES.filter((t) => t.season === "evergreen" && (!t.needsSchool || includeSchool));
-    for (const t of shuffle(extra)) {
-      if (picked.length >= 12) break;
-      const title = renderTemplate(t.titleTemplate, vars).replace(/\s+/g, " ").trim();
-      if (!title) continue;
-      picked.push({ id: t.id, intent: t.intent, title, tags: t.tags, needsSchool: t.needsSchool });
-    }
-  }
-  return picked.slice(0, 12);
-}
 
 function intentLabel(intent: Intent) {
-  return { info: "정보형", problem: "문제해결형", compare: "비교형", consult: "상담형" }[intent];
+  return { info: "정보형", problem: "문제해결형", compare: "비교형", consult: "상담형", homefeed: "홈피드형" }[intent] ?? intent;
 }
 function seasonLabel(season: Season) {
   return SEASONS.find((s) => s.value === season)?.label ?? season;
