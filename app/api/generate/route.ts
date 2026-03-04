@@ -72,7 +72,7 @@ const ANTHROPIC_PASS1_DEFAULT  = "claude-sonnet-4-5";
 const OPENAI_PASS2_MODEL       = "gpt-4.1-mini";
 const ANTHROPIC_PASS2_MODEL    = "claude-haiku-4-5";
 
-const MIN_BODY_LENGTH    = 1100;
+const MIN_BODY_LENGTH    = 1200;
 const MAX_BODY_LENGTH    = 4000;
 const MAX_FIRST_PARA_LEN = 150;
 
@@ -195,10 +195,20 @@ function buildStudyHallSystemPrompt(): string {
 - 이모지(emoji) 사용 절대 금지
 - 과장·보장 표현 금지
 
-[구조]
-- 소제목: [소제목] 대괄호 형식, 4~6개
-- FAQ: Q: / A: 형식, 3~4쌍
-- 본문 길이: 1100~3500자
+[구조 — 반드시 지킬 것]
+- 소제목: [소제목] 대괄호 형식, 반드시 4~6개 (더 적거나 많으면 오류)
+- FAQ: Q: / A: 형식, 반드시 3~4쌍 포함
+- 본문 길이: 반드시 1500자 이상 2800자 이하
+  → 출력 전 글자 수를 반드시 세어볼 것. 1500자 미만이면 각 소제목 아래 내용을 보강해서 1500자 이상으로 만들고 재출력.
+  → 각 소제목 아래 최소 3~4문장 이상 작성할 것.
+  → FAQ의 각 A: 답변도 3~4문장 이상 구체적으로 작성할 것.
+
+[출력 전 자가 체크리스트 — 반드시 확인 후 출력]
+☑ 소제목([소제목] 형식)이 4~6개인가?
+☑ FAQ (Q:/A:) 쌍이 3~4개인가?
+☑ 본문이 1500자 이상인가? (미만이면 보강 후 재출력)
+☑ 핵심 키워드가 첫 문단에 정확히 1회 포함됐는가?
+☑ 해시태그가 정확히 20개인가?
 
 [출력 형식]
 반드시 아래 JSON만 출력. 마크다운 코드블록(\`\`\`) 포함 그 외 텍스트 절대 금지:
@@ -232,8 +242,10 @@ function buildStudyHallUserPrompt(input: Payload["input"]): string {
 1. 첫 문단(2~3문장): 핵심 키워드 "${coreKw}"를 자연스럽게 1회 포함. 150자 이내.
 2. 본문: 관리형독서실의 학습관리·교재선정·학습인증·질문해결·루틴 관리 관점에서 작성.
 3. ${gradeLabel} 학생과 학부모의 현실적 고민을 중심으로 구체적으로 서술.
-4. 소제목 4~6개, FAQ 3~4쌍 포함.
-5. 해시태그: #${input.region}관리형독서실, #${input.region}독서실, #${gradeLabel}독서실 등 지역+학년+관독 조합 포함.
+4. 소제목 [소제목] 형식으로 반드시 4~6개 작성. 각 소제목 아래 본문 3~5문장 이상 반드시 작성.
+5. FAQ Q:/A: 형식으로 반드시 3~4쌍 작성. 각 A: 답변은 3~4문장 이상 구체적으로 작성.
+6. 해시태그: #${input.region}관리형독서실, #${input.region}독서실, #${gradeLabel}독서실 등 지역+학년+관독 조합 포함.
+7. 본문 전체 1500자 이상 반드시 작성. 출력 전 글자 수를 세어서 1500자 미만이면 내용을 보강 후 재출력.
 
 JSON만 출력.
   `.trim();
@@ -467,12 +479,9 @@ STEP 6. 자체검사 (출력 전 내부 확인)
 function buildRepairPrompt(
   input: Payload["input"],
   detail: ValidationDetail,
-  previousOutput: string,
-  serviceType?: string
+  previousOutput: string
 ): string {
-  const coreKeyword = serviceType === "studyhall"
-    ? `${input.region} ${input.shGrade ?? ""} 관리형독서실 ${input.shGoal ?? ""}`.replace(/\s+/g, " ").trim()
-    : makeCoreKeyword(input);
+  const coreKeyword = makeCoreKeyword(input);
   const failures: string[] = [];
 
   if (!detail.keywordOk)
@@ -872,7 +881,7 @@ export async function POST(req: Request) {
   if (!pass1Result.success) {
     const prevText = extractText(pass1Res.text, pass1IsAnthropic) ?? "";
     const repairPrompt = pass1Result.detail && prevText
-      ? buildRepairPrompt(input, pass1Result.detail, prevText, serviceType)
+      ? buildRepairPrompt(input, pass1Result.detail, prevText)
       : usrPr;
 
     try {
