@@ -328,6 +328,7 @@ export default function Page() {
   const [schoolMode, setSchoolMode] = useState(false);
   const [schoolName, setSchoolName] = useState("");
   const [noExamMode, setNoExamMode] = useState(false);
+  const [includeAcademy, setIncludeAcademy] = useState(false);
 
   const [selectedTopic, setSelectedTopic] = useState<TopicCard | null>(null);
   const [result, setResult]     = useState<GenerateResult | null>(null);
@@ -396,6 +397,7 @@ export default function Page() {
             schoolName: schoolMode ? schoolName.trim() : "",
             topicTitle: selectedTopic.title,
             intent: selectedTopic.intent,
+            includeAcademy,
           },
         }),
       });
@@ -623,6 +625,24 @@ export default function Page() {
                   exam 시즌(시험 전/후) 및 내신·수능 목표가 숨겨집니다.
                 </p>
               )}
+            </div>
+
+            {/* 학원 키워드 포함 */}
+            <div className="mt-4 rounded-xl border border-neutral-800 p-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <div className="font-semibold">키워드에 "학원" 포함</div>
+                  <div className="text-sm text-neutral-300">
+                    체크 시 핵심 키워드에 "학원"이 포함됩니다.
+                    <span className="block text-xs text-neutral-500 mt-0.5">
+                      예: 송도 중등 영어학원 내신
+                    </span>
+                  </div>
+                </div>
+                <input type="checkbox" checked={includeAcademy}
+                  onChange={(e) => setIncludeAcademy(e.target.checked)}
+                  className="h-5 w-5" />
+              </div>
             </div>
 
             {/* 학교별 포스팅 */}

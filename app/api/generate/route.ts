@@ -33,6 +33,7 @@ type Payload = {
     schoolName?: string;
     topicTitle: string;
     intent: Intent | string;
+    includeAcademy?: boolean; // 키워드에 "학원" 포함 여부
   };
 };
 
@@ -160,9 +161,10 @@ function makeCoreKeyword(input: Payload["input"]): string {
   const subject = SUBJECT_LABEL[input.subject] ?? input.subject;
   const grade   = GRADE_LABEL[input.gradeBand] ?? input.gradeBand;
   const goal    = GOAL_LABEL[input.goal] ?? input.goal;
+  const subjectPart = input.includeAcademy ? `${subject}학원` : subject;
   return input.schoolName?.trim()
-    ? `${input.region} ${input.schoolName.trim()} ${grade} ${subject}학원 ${goal}`
-    : `${input.region} ${grade} ${subject}학원 ${goal}`;
+    ? `${input.region} ${input.schoolName.trim()} ${grade} ${subjectPart} ${goal}`
+    : `${input.region} ${grade} ${subjectPart} ${goal}`;
 }
 
 // ─────────────────────────────────────────────
@@ -325,6 +327,8 @@ STEP 1. 첫 문단 작성
   - 빈 줄(\\n\\n) 이전까지가 첫 문단
   - 첫 문단 전체가 120자 이내 (줄바꿈 포함)
   - 핵심 키워드 "${coreKeyword}"를 정확히 1회만 포함 (0회·2회 모두 오류)
+  - 키워드는 반드시 "${coreKeyword}" 그대로 사용 — "학원" 삭제·순서 변경·단어 추가 절대 금지
+  - 예: "${coreKeyword}" → ✓ / "${coreKeyword.replace("학원", "")}" → ✗
   - 질문 또는 상황 묘사로 시작
   - 시즌("${input.season}")에 맞는 도입
 
